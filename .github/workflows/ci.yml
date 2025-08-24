@@ -38,21 +38,23 @@ jobs:
         run: pytest -v
         continue-on-error: true
 
-      # 7. Notify Slack
+      # 7. Slack Notification
       - name: Slack Notification
         if: always()
         run: |
+          # Sprawdzamy wyniki wcześniejszych kroków
+          STATUS="SUCCESS"
           if [[ "${{ steps.flake8.outcome }}" == "failure" ]] || [[ "${{ steps.pytest.outcome }}" == "failure" ]]; then
             STATUS="FAILED"
-          else
-            STATUS="SUCCESS"
           fi
 
+          # Tworzymy prosty tekst wiadomości
           MSG="$STATUS: $GITHUB_REPOSITORY @ ${GITHUB_SHA::7} on $GITHUB_REF_NAME"
 
           # Generujemy poprawny JSON z jq
           JSON_PAYLOAD=$(jq -n --arg msg "$MSG" '{text: $msg}')
 
+          # Wysyłamy powiadomienie Slack
           curl -X POST -H 'Content-type: application/json' \
-            --data "$JSON_PAYLOAD" \
-            "${{ secrets.SLACK_WEBHOOK_URL }}"
+               --data-raw "$JSON_PAYLOAD" \
+               "${{ secrets.SLACK_WEBHOOK_URL }}"
