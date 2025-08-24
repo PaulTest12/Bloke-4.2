@@ -46,9 +46,16 @@ jobs:
         if: always()
         run: |
           FAILED=0
-          if [[ "${{ steps.flake8.outcome }}" == "failure" ]]; then FAILED=1; fi
-          if [[ "${{ steps.pylint.outcome }}" == "failure" ]]; then FAILED=1; fi
-          if [[ "${{ steps.pytest.outcome }}" == "failure" ]]; then FAILED=1; fi
+
+          if [[ "${{ steps.flake8.outcome }}" == "failure" ]]; then
+            FAILED=1
+          fi
+          if [[ "${{ steps.pylint.outcome }}" == "failure" ]]; then
+            FAILED=1
+          fi
+          if [[ "${{ steps.pytest.outcome }}" == "failure" ]]; then
+            FAILED=1
+          fi
 
           if [[ $FAILED -eq 1 ]]; then
             STATUS="❌ FAILED"
@@ -56,8 +63,9 @@ jobs:
             STATUS="✅ SUCCESS"
           fi
 
-          MSG="$STATUS: $GITHUB_REPOSITORY @ ${GITHUB_SHA::7} on $GITHUB_REF_NAME → $RUN_URL"
-          curl -X POST -H "Content-type: application/json" \
+          MSG="$STATUS: $GITHUB_REPOSITORY @ ${GITHUB_SHA::7} on $GITHUB_REF_NAME -> $RUN_URL"
+
+          curl -X POST -H 'Content-type: application/json' \
             --data "{\"text\":\"$MSG\"}" \
             "${{ secrets.SLACK_WEBHOOK_URL }}"
 
