@@ -24,7 +24,8 @@ jobs:
         run: pylint app.py tests/*.py
 
       - name: Run tests
-        run: pytest -v
+        run: PYTHONPATH=. pytest -v
+
 
   docker:
     runs-on: ubuntu-latest
