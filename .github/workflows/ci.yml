@@ -21,12 +21,11 @@ jobs:
         run: flake8 .
 
       - name: Run pylint
-        run: pylint app.py tests/*.py || true   # niech przejdzie dalej, by Slack się odezwał
+        run: pylint app.py tests/*.py || true
 
       - name: Run pytest
         run: pytest -v
 
-      # Slack notify (on failure)
       - name: Notify Slack on failure
         if: failure()
         run: |
@@ -34,7 +33,6 @@ jobs:
           --data '{"text":"❌ Pipeline *FAILED* dla repo `${{ github.repository }}` w commit `${{ github.sha }}`"}' \
           ${{ secrets.SLACK_WEBHOOK_URL }}
 
-      # Slack notify (on success)
       - name: Notify Slack on success
         if: success()
         run: |
@@ -55,5 +53,4 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: false
-          tags: ci-docker:latest
+          push:
