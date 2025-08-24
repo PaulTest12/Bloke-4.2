@@ -1,15 +1,59 @@
-name: Slack Test
+name: Python CI + Docker + Slack
 
-on:
-  workflow_dispatch:  # ręczne uruchamianie
+on: [push, pull_request]
 
 jobs:
-  notify:
+  test:
     runs-on: ubuntu-latest
     steps:
-      - name: Send test notification to Slack
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run flake8
+        run: flake8 .
+
+      - name: Run pylint
+        run: pylint app.py tests/*.py || true   # niech przejdzie dalej, by Slack się odezwał
+
+      - name: Run pytest
+        run: pytest -v
+
+      # Slack notify (on failure)
+      - name: Notify Slack on failure
+        if: failure()
         run: |
           curl -X POST -H 'Content-type: application/json' \
-          --data '{"text":"✅ Testowe powiadomienie z GitHub Actions działa!"}' \
+          --data '{"text":"❌ Pipeline *FAILED* dla repo `${{ github.repository }}` w commit `${{ github.sha }}`"}' \
           ${{ secrets.SLACK_WEBHOOK_URL }}
 
+      # Slack notify (on success)
+      - name: Notify Slack on success
+        if: success()
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+          --data '{"text":"✅ Pipeline *PASSED* dla repo `${{ github.repository }}` w commit `${{ github.sha }}`"}' \
+          ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: ci-docker:latest
