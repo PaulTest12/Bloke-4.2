@@ -6,11 +6,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      # 1. Checkout repo
+      # 1. Checkout repository
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Set PYTHONPATH (aby pytest widział moduł app)
+      # 2. Set PYTHONPATH so tests can find app module
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=$(pwd)" >> $GITHUB_ENV
 
@@ -42,18 +42,19 @@ jobs:
       - name: Slack Notification
         if: always()
         run: |
+          # Determine SUCCESS or FAILED based on previous steps
           STATUS="SUCCESS"
           if [[ "${{ steps.flake8.outcome }}" == "failure" ]] || [[ "${{ steps.pytest.outcome }}" == "failure" ]]; then
             STATUS="FAILED"
           fi
 
+          # Compose simple ASCII message
           MSG="$STATUS: $GITHUB_REPOSITORY @ ${GITHUB_SHA::7} on $GITHUB_REF_NAME"
 
-          # Tworzymy poprawny JSON
+          # Generate valid JSON safely with jq
           JSON_PAYLOAD=$(jq -n --arg msg "$MSG" '{text: $msg}')
 
-          # Wysyłamy powiadomienie Slack (bez błędów curl)
+          # Send notification to Slack (no curl errors)
           curl -X POST -H 'Content-type: application/json' \
                --data-raw "$JSON_PAYLOAD" \
                "${{ secrets.SLACK_WEBHOOK_URL }}"
-
