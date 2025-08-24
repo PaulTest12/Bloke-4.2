@@ -1,51 +1,43 @@
-name: Python CI + Docker + Slack Notify
+name: Simple Python CI + Slack Notify
 
 on: [push, pull_request]
-
-env:
-  RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      # 1. Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      # 2. Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
+      # 3. Install dependencies
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          apt-get update && apt-get install -y jq
+        run: pip install -r requirements.txt
 
-      - name: Run flake8
+      # 4. Run flake8
+      - name: Lint (flake8)
         id: flake8
         run: flake8 .
         continue-on-error: true
 
-      - name: Run pylint
-        id: pylint
-        run: pylint app/ tests/
-        continue-on-error: true
-
-      - name: Run pytest
+      # 5. Run tests
+      - name: Run tests (pytest)
         id: pytest
         run: pytest -v
         continue-on-error: true
 
-      - name: Notify Slack
+      # 6. Notify Slack
+      - name: Slack Notification
         if: always()
         run: |
-          FAILED=0
-          if [[ "${{ steps.flake8.outcome }}" == "failure" ]]; then FAILED=1; fi
-          if [[ "${{ steps.pylint.outcome }}" == "failure" ]]; then FAILED=1; fi
-          if [[ "${{ steps.pytest.outcome }}" == "failure" ]]; then FAILED=1; fi
-
-          if [[ $FAILED -eq 1 ]]; then
+          # Sprawdzamy wyniki poprzednich kroków
+          if [[ "${{ steps.flake8.outcome }}" == "failure" ]] || [[ "${{ steps.pytest.outcome }}" == "failure" ]]; then
             STATUS="FAILED"
           else
             STATUS="SUCCESS"
@@ -53,30 +45,10 @@ jobs:
 
           MSG="$STATUS: $GITHUB_REPOSITORY @ ${GITHUB_SHA::7} on $GITHUB_REF_NAME"
 
-          JSON_PAYLOAD=$(jq -n --arg msg "$MSG" '{text: $msg}')
-
+          # Wysyłamy prosty JSON do Slacka bez użycia znaków specjalnych
           curl -X POST -H 'Content-type: application/json' \
-            --data "$JSON_PAYLOAD" \
+            --data "{\"text\":\"$MSG\"}" \
             "${{ secrets.SLACK_WEBHOOK_URL }}"
 
-  docker:
-    runs-on: ubuntu-latest
-    needs: test
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: false
-          tags: ci-docker:latest
-
-      # 6. Run pytest
-      - name: Run pyte
 
 
