@@ -9,45 +9,46 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      # 1. Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. Ustawienie Pythona
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
+      # 3. Instalacja zależności
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      # Lint flake8
-      - name: Run static analysis (flake8)
+      # 4. Analiza statyczna - flake8
+      - name: Run flake8
+        id: flake8
         run: flake8 .
         continue-on-error: true
-        id: flake8_step
 
-      # Lint pylint
-      - name: Run static analysis (pylint)
+      # 5. Analiza statyczna - pylint
+      - name: Run pylint
+        id: pylint
         run: pylint app/ tests/
         continue-on-error: true
-        id: pylint_step
 
-      # Testy pytest
-      - name: Run tests
+      # 6. Testy pytest
+      - name: Run pytest
+        id: pytest
         run: pytest -v
         continue-on-error: true
-        id: pytest_step
 
-      # --- POWIADOMIENIE SLACK ---
+      # 7. Powiadomienie Slack
       - name: Notify Slack
-        if: always()  # <- krok wykona się niezależnie od błędów
+        if: always()
         run: |
           FAILED=0
-          for STEP in flake8_step pylint_step pytest_step; do
-            if [[ "${{ steps.$STEP.outcome }}" == "failure" ]]; then
-              FAILED=1
-            fi
-          done
+          if [[ "${{ steps.flake8.outcome }}" == "failure" ]]; then FAILED=1; fi
+          if [[ "${{ steps.pylint.outcome }}" == "failure" ]]; then FAILED=1; fi
+          if [[ "${{ steps.pytest.outcome }}" == "failure" ]]; then FAILED=1; fi
 
           if [[ $FAILED -eq 1 ]]; then
             STATUS="❌ FAILED"
@@ -71,9 +72,5 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: false
-          tags: ci-docker:latest
+        u
 
