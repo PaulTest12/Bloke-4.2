@@ -1,4 +1,4 @@
-name: Simple Python CI + Slack Notify
+name: Python CI + Slack Notify
 
 on: [push, pull_request]
 
@@ -6,31 +6,39 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      # 1. Checkout repo
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Dodajemy PYTHONPATH, żeby tests mogły importować app
+      # 2. Set PYTHONPATH
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=$(pwd)" >> $GITHUB_ENV
 
+      # 3. Setup Python
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
+      # 4. Install dependencies + jq
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          sudo apt-get update && sudo apt-get install -y jq
 
+      # 5. Run flake8
       - name: Lint (flake8)
         id: flake8
         run: flake8 .
         continue-on-error: true
 
+      # 6. Run pytest
       - name: Run tests (pytest)
         id: pytest
         run: pytest -v
         continue-on-error: true
 
+      # 7. Notify Slack
       - name: Slack Notification
         if: always()
         run: |
@@ -42,6 +50,9 @@ jobs:
 
           MSG="$STATUS: $GITHUB_REPOSITORY @ ${GITHUB_SHA::7} on $GITHUB_REF_NAME"
 
+          # Generujemy poprawny JSON z jq
+          JSON_PAYLOAD=$(jq -n --arg msg "$MSG" '{text: $msg}')
+
           curl -X POST -H 'Content-type: application/json' \
-            --data "{\"text\":\"$MSG\"}" \
+            --data "$JSON_PAYLOAD" \
             "${{ secrets.SLACK_WEBHOOK_URL }}"
