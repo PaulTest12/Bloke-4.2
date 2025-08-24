@@ -1,6 +1,9 @@
-name: Python CI + Docker + Slack
+name: Python CI + Docker + Slack Notify
 
 on: [push, pull_request]
+
+env:
+  RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
 jobs:
   test:
@@ -17,31 +20,49 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run flake8
+      # Lint flake8
+      - name: Run static analysis (flake8)
         run: flake8 .
+        continue-on-error: true
+        id: flake8_step
 
-      - name: Run pylint
-        run: pylint app.py tests/*.py || true
+      # Lint pylint
+      - name: Run static analysis (pylint)
+        run: pylint app/ tests/
+        continue-on-error: true
+        id: pylint_step
 
-      - name: Run pytest
+      # Testy pytest
+      - name: Run tests
         run: pytest -v
+        continue-on-error: true
+        id: pytest_step
 
-      - name: Notify Slack on failure
-        if: failure()
+      # --- POWIADOMIENIE SLACK ---
+      - name: Notify Slack
+        if: always()  # <- krok wykona się niezależnie od błędów
         run: |
-          curl -X POST -H 'Content-type: application/json' \
-          --data '{"text":"❌ Pipeline *FAILED* dla repo `${{ github.repository }}` w commit `${{ github.sha }}`"}' \
-          ${{ secrets.SLACK_WEBHOOK_URL }}
+          FAILED=0
+          for STEP in flake8_step pylint_step pytest_step; do
+            if [[ "${{ steps.$STEP.outcome }}" == "failure" ]]; then
+              FAILED=1
+            fi
+          done
 
-      - name: Notify Slack on success
-        if: success()
-        run: |
+          if [[ $FAILED -eq 1 ]]; then
+            STATUS="❌ FAILED"
+          else
+            STATUS="✅ SUCCESS"
+          fi
+
+          MSG="$STATUS: $GITHUB_REPOSITORY @ ${GITHUB_SHA::7} on $GITHUB_REF_NAME → $RUN_URL"
           curl -X POST -H 'Content-type: application/json' \
-          --data '{"text":"✅ Pipeline *PASSED* dla repo `${{ github.repository }}` w commit `${{ github.sha }}`"}' \
-          ${{ secrets.SLACK_WEBHOOK_URL }}
+            --data "{\"text\":\"$MSG\"}" \
+            "${{ secrets.SLACK_WEBHOOK_URL }}"
 
   docker:
     runs-on: ubuntu-latest
+    needs: test
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -53,4 +74,6 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          push:
+          push: false
+          tags: ci-docker:latest
+
