@@ -6,39 +6,37 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      # 1. Checkout repository
+      
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Set PYTHONPATH so tests can find app module
+    
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=$(pwd)" >> $GITHUB_ENV
 
-      # 3. Setup Python
+ 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      # 4. Install dependencies + jq
+      
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
           sudo apt-get update && sudo apt-get install -y jq
 
-      # 5. Run flake8
       - name: Lint (flake8)
         id: flake8
         run: flake8 .
         continue-on-error: true
 
-      # 6. Run pytest
+      
       - name: Run tests (pytest)
         id: pytest
         run: pytest -v
         continue-on-error: true
 
-      # 7. Slack Notification
       - name: Slack Notification
         if: always()
         run: |
